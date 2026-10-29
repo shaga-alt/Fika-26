@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1,
+      user-scalable=no">
+<title>Ultimate Football 3D</title>
+
+<style>
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: #101820;
+  font-family: Arial, sans-serif;
+  color: white;
+  touch-action: none;
+}
+
+canvas {
+  display: block;
+}
+
+#hud {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  text-align: center;
+  pointer-events: none;
+}
+
+#score {
+  background: rgba(0,0,0,.8);
+  border: 2px solid rgba(255,255,255,.5);
+  border-radius: 10px;
+  padding: 9px 20px;
+  font-weight: bold;
+  font-size: 21px;
+  white-space: nowrap;
+}
+
+#clock {
+  margin-top: 5px;
+  font-size: 13px;
+  text-shadow: 0 2px 4px black;
+}
+
+#message {
+  margin-top: 7px;
+  font-size: 14px;
+  font-weight: bold;
+  text-shadow: 0 2px 4px black;
+}
+
+#controls {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+#joystick {
+  position: absolute;
+  left: 18px;
+  bottom: 25px;
+  width: 145px;
+  height: 145px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.13);
+  border: 2px solid rgba(255,255,255,.4);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+#stick {
+  position: absolute;
+  width: 58px;
+  height: 58px;
+  left: 41px;
+  top: 41px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.8);
+  box-shadow: 0 3px 12px #0008;
+}
+
+.buttons {
+  position: absolute;
+  right: 15px;
+  bottom: 22px;
+  display: grid;
+  grid-template-columns: repeat(2, 76px);
+  gap: 10px;
+  pointer-events: auto;
+}
+
+button {
+  border: 2px solid rgba(255,255,255,.65);
+  color: white;
+  background: rgba(0,0,0,.72);
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: bold;
+  min-height: 57px;
+  padding: 8px 4px;
+  touch-action: none;
+}
+
+button:active {
+  background: #167bff;
+  transform: scale(.96);
+}
+
+#cameraButton {
+  position: absolute;
+  right: 14px;
+  top: 90px;
+  min-height: 43px;
+  pointer-events: auto;
+}
+
+#restartButton {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 12px;
+  min-height: 38px;
+  padding: 8px 15px;
+  pointer-events: auto;
+}
+
+#help {
+  position: fixed;
+  left: 50%;
+  top: 92px;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: white;
+  opacity: .85;
+  text-align: center;
+  width: 90%;
+  pointer-events: none;
+}
+
+@media (max-width: 390px) {
+  #joystick {
+    width: 120px;
+    height: 120px;
+    left: 10px;
+    bottom: 20px;
+  }
+
+  #stick {
+    left: 31px;
+    top: 31px;
+    width: 54px;
+    height: 54px;
+  }
+
+  .buttons {
+    right: 8px;
+    bottom: 18px;
+    grid-template-columns: repeat(2, 65px);
+    gap: 7px;
+  }
+
+  button {
+    font-size: 11px;
+    min-height: 51px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div id="hud">
+  <div id="score">
+    <span style="color:#44aaff">BLUE</span>
+    <span id="blueScore">0</span>
+    -
+    <span id="redScore">0</span>
+    <span style="color:#ff5555">RED</span>
+  </div>
+  <div id="clock">00:00</div>
+  <div id="message">ULTIMATE FOOTBALL 3D</div>
+</div>
+
+<div id="help">
+  Move with the joystick • WASD also works on computers
+</div>
+
+<div id="controls">
+  <div id="joystick">
+    <div id="stick"></div>
+  </div>
+
+  <button id="cameraButton">📷 SWITCH CAMERA</button>
+
+  <div class="buttons">
+    <button id="passButton">PASS</button>
+    <button id="shootButton">SHOOT ⚽</button>
+    <button id="sprintButton">SPRINT</button>
+    <button id="switchButton">CHANGE PLAYER</button>
+  </div>
+
+  <button id="restartButton">RESTART MATCH</button>
+</div>
+
+<script type="module">
+import * as THREE from
+  'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87b8e8);
+scene.fog = new THREE.Fog(0x87b8e8, 100, 220);
+
+const camera = new THREE.PerspectiveCamera(
+  60, innerWidth / innerHeight, 0.1, 400
+);
+
+const renderer = new THREE.WebGLRenderer({
+  antialias: true,
+  powerPreference: 'high-performance'
+});
+
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+document.body.prepend(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x446044, 2));
+
+const sun = new THREE.DirectionalLight(0xffffff, 2.5);
+sun.position.set(-25, 45, 20);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+scene.add(sun);
+
+// Pitch dimensions
+const W = 68;
+const L = 105;
+const grass = new THREE.Mesh(
+  new THREE.PlaneGeometry(W, L),
+  new THREE.MeshStandardMaterial({
+    color: 0x26843c,
+    roughness: 1
+  })
+);
+
+grass.rotation.x = -Math.PI / 2;
+grass.receiveShadow = true;
+scene.add(grass);
+
+const field = new THREE.Group();
+scene.add(field);
+
+function line(x1, z1, x2, z2, color = 0xffffff) {
+  const points = [
+    new THREE.Vector3(x1, 0.035, z1),
+    new THREE.Vector3(x2, 0.035, z2)
+  ];
+
+  const mesh = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(points),
+    new THREE.LineBasicMaterial({ color })
+  );
+
+  field.add(mesh);
+}
+
+function rectangle(x1, z1, x2, z2) {
+  line(x1, z1, x2, z1);
+  line(x2, z1, x2, z2);
+  line(x2, z2, x1, z2);
+  line(x1, z2, x1, z1);
+}
+
+line(-W/2, -L/2, W/2, -L/2);
+line(-W/2, L/2, W/2, L/2);
+line(-W/2, -L/2, -W/2, L/2);
+line(W/2, -L/2, W/2, L/2);
+line(-W/2, 0, W/2, 0);
+
+rectangle(-20.16, -52.5, 20.16, -35);
+rectangle(-20.16, 35, 20.16, 52.5);
+rectangle(-9.16, -52.5, 9.16, -47);
+rectangle(-9.16, 47, 9.16, 52.5);
+
+// Center circle
+const circlePoints = [];
+
+for (let i = 0; i <= 100; i++) {
+  const a = i / 100 * Math.PI * 2;
+
+  circlePoints.push(
+    new THREE.Vector3(
+      Math.cos(a) * 9.15,
+      0.04,
+      Math.sin(a) * 9.15
+    )
+  );
+}
+
+field.add(new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints(circlePoints),
+  new THREE.LineBasicMaterial({ color: 0xffffff })
+));
+
+// Alternating grass stripes
+for (let i = 0; i < 10; i++) {
+  const stripe = new THREE.Mesh(
+    new THREE.PlaneGeometry(W, L / 10),
+    new THREE.MeshBasicMaterial({
+      color: i % 2 ? 0xffffff : 0x000000,
+      transparent: true,
+      opacity: i % 2 ? 0.035 : 0.045
+    })
+  );
+
+  stripe.rotation.x = -Math.PI / 2;
+  stripe.position.set(0, 0.012, -L/2 + L/20 + i*L/10);
+  scene.add(stripe);
+}
+
+// Stadium stands
+for (const side of [-1, 1]) {
+  for (let row = 0; row < 4; row++) {
+    const stand = new THREE.Mesh(
+      new THREE.BoxGeometry(W + 18, 2.5, 4),
+      new THREE.MeshStandardMaterial({
+        color: [0x444c5a, 0x555d6b, 0x394351, 0x596273][row]
+      })
+    );
+
+    stand.position.set(
+      0,
+      2 + row * 2,
+      side * (L/2 + 8 + row*3)
+    );
+
+    scene.add(stand);
+  }
+}
+
+for (const side of [-1, 1]) {
+  for (let row = 0; row < 3; row++) {
+    const stand = new THREE.Mesh(
+      new THREE.BoxGeometry(4, 2.5, L + 20),
+      new THREE.MeshStandardMaterial({ color: 0x424d60 })
+    );
+
+    stand.position.set(
+      side * (W/2 + 8 + row*3),
+      2 + row*2,
+      0
+    );
+
+    scene.add(stand);
+  }
+}
+
+// Simple floodlights
+for (const x of [-43, 43]) {
+  for (const z of [-48, 48]) {
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(.25, .4, 18, 8),
+      new THREE.MeshStandardMaterial({ color: 0x777777 })
+    );
+
+    pole.position.set(x, 9, z);
+    scene.add(pole);
+
+    const lamp = new THREE.PointLight(0xffffff, 25, 50);
+    lamp.position.set(x, 19, z);
+    scene.add(lamp);
+  }
+}
+
+// Goals at both ends
+function makeGoal(z) {
+  const goal = new THREE.Group();
+  const material = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: .5
+  });
+
+  const goalWidth = 7.32;
+  const goalHeight = 2.44;
+  const frontZ = z;
+
+  function bar(x, y, zz, sx, sy, sz) {
+    const m = new THREE.Mesh(
+      new THREE.BoxGeometry(sx, sy, sz),
+      material
+    );
+
+    m.position.set(x, y, zz);
+    m.castShadow = true;
+    goal.add(m);
+  }
+
+  bar(-goalWidth/2, goalHeight/2, frontZ, .15, goalHeight, .15);
+  bar(goalWidth/2, goalHeight/2, frontZ, .15, goalHeight, .15);
+  bar(0, goalHeight, frontZ, goalWidth, .15, .15);
+
+  bar(-goalWidth/2, goalHeight/2, frontZ + Math.sign(z)*2, .1, goalHeight, .1);
+  bar(goalWidth/2, goalHeight/2, frontZ + Math.sign(z)*2, .1, goalHeight, .1);
+  bar(0, goalHeight, frontZ + Math.sign(z)*2, goalWidth, .1, .1);
+
+  for (let i = 0; i <= 10; i++) {
+    const x = -goalWidth/2 + goalWidth*i/10;
+
+    const netLine = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(x, 0, frontZ),
+        new THREE.Vector3(x, goalHeight, frontZ)
+      ]),
+      new THREE.LineBasicMaterial({ color: 0xffffff })
+    );
+
+    goal.add(netLine);
+  }
+
+  scene.add(goal);
+}
+
+makeGoal(-52.5);
+makeGoal(52.5);
+
+// Player models
+const players = [];
+
+function makePlayer(color, x, z, team, index) {
+  const root = new THREE.Group();
+  root.position.set(x, 0, z);
+
+  const shirtMat = new THREE.MeshStandardMaterial({
+    color,
+    roughness: .65
+  });
+
+  const shortsMat = new THREE.MeshStandardMaterial({
+    color: team === 'blue' ? 0x102b66 : 0x222222
+  });
+
+  const skinMat = new THREE.MeshStandardMaterial({
+    color: 0x9a6547,
+    roughness: .85
+  });
+
+  const bootMat = new THREE.MeshStandardMaterial({
+    color: 0x171717
+  });
+
+  function bodyPart(geometry, material, x, y, z) {
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = true;
+    root.add(mesh);
+    return mesh;
+  }
+
+  bodyPart(
+    new THREE.CylinderGeometry(.27, .34, .68, 10),
+    shirtMat, 0, 1.15, 0
+  );
+
+  bodyPart(
+    new THREE.SphereGeometry(.22, 12, 10),
+    skinMat, 0, 1.68, 0
+  );
+
+  bodyPart(
+    new THREE.SphereGeometry(.225, 12, 8),
+    new THREE.MeshStandardMaterial({ color: 0x17120e }),
+    0, 1.78, 0
+  );
+
+  bodyPart(
+    new THREE.BoxGeometry(.48, .22, .28),
+    shortsMat, 0, .7, 0
+  );
+
+  const legs = [];
+
+  for (const side of [-1, 1]) {
+    const leg = bodyPart(
+      new THREE.CylinderGeometry(.09, .075, .55, 8),
+      skinMat, side*.14, .36, 0
+    );
+
+    legs.push(leg);
+
+    bodyPart(
+      new THREE.BoxGeometry(.15, .1, .3),
+      bootMat, side*.14, .09, -.07
+    );
+
+    const arm = bodyPart(
+      new THREE.CylinderGeometry(.07, .065, .5, 8),
+      skinMat, side*.34, 1.18, 0
+    );
+
+    arm.rotation.z = side * -.18;
+  }
+
+  const number = bodyPart(
+    new THREE.BoxGeometry(.18, .22, .025),
+    new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    0, 1.2, -.3
+  );
+
+  root.userData.legs = legs;
+  root.userData.index = index;
+  root.userData.team = team;
+  root.userData.number = number;
+
+  scene.add(root);
+  players.push(root);
+  return root;
+}
+
+// Blue team: user controls the first player
+const blueTeam = [
+  makePlayer(0x0878ff, 0, 17, 'blue', 1),
+  makePlayer(0x0878ff, -13, 8, 'blue', 2),
+  makePlayer(0x0878ff, 13, 8, 'blue', 3),
+  makePlayer(0x0878ff, -8, 25, 'blue', 4),
+  makePlayer(0x0878ff, 8, 25, 'blue', 5)
+];
+
+// Red team: opponents
+const redTeam = [
+  makePlayer(0xff3030, 0, -17, 'red', 1),
+  makePlayer(0xff3030, -13, -8, 'red', 2),
+  makePlayer(0xff3030, 13, -8, 'red', 3),
+  makePlayer(0xff3030, -8, -27, 'red', 4),
+  makePlayer(0xff3030, 8, -27, 'red', 5)
+];
+
+let activePlayer = blueTeam[0];
+
+// Football
+const ball = new THREE.Mesh(
+  new THREE.SphereGeometry(.32, 20, 16),
+  new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: .45
+  })
+);
+
+ball.castShadow = true;
+ball.position.set(0, .32, 15);
+scene.add(ball);
+
+const ballMark = new THREE.Mesh(
+  new THREE.CircleGeometry(.35, 20),
+  new THREE.MeshBasicMaterial({
+    color: 0x000000,
+    transparent: true,
+    opacity: .2
+  })
+);
+
+ballMark
